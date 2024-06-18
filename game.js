@@ -22,8 +22,6 @@ const playerCircle = {
     shootCooldown: 500, // Cooldown time between shots in milliseconds
 };
 
-
-const enemies = [];
 // Enemy properties
 const enemyCircle = {
     radius: 20,
