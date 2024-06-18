@@ -111,21 +111,10 @@ canvas.addEventListener('click', () => {
     }
 });
 
-// This is to add another enemy
-function addEnemy() {
-    enemies.push({
-        radius: 20,
-        lives: 3,
-        shootCooldown: 2500,
-        x: Math.random() * worldWidth,
-        y: Math.random() * worldHeight
-    });
-}
-
 // Function to update game state
 function update() {
-    if (isPaused) return; // Skip update if the game is paused
-
+    if (isPaused || isGameOver) return; // Skip update if the game is paused or over
+    
     let dx = 0;
     let dy = 0;
 
@@ -150,80 +139,67 @@ function update() {
     playerCircle.x = Math.max(playerCircle.radius, Math.min(worldWidth - playerCircle.radius, playerCircle.x));
     playerCircle.y = Math.max(playerCircle.radius, Math.min(worldHeight - playerCircle.radius, playerCircle.y));
 
-    // Check collision with enemies
-    enemies.forEach((enemy, enemyIndex) => {
-        const distanceToEnemy = Math.sqrt((playerCircle.x - enemy.x) ** 2 + (playerCircle.y - enemy.y) ** 2);
-        if (distanceToEnemy < playerCircle.radius + enemy.radius && !isPlayerInvincible) {
-            // Player touches the enemy and is not invincible
-            playerCircle.lives--;
+    // Check collision with enemy circle
+    const distanceToEnemy = Math.sqrt((playerCircle.x - enemyCircle.x) ** 2 + (playerCircle.y - enemyCircle.y) ** 2);
+    if (distanceToEnemy < playerCircle.radius + enemyCircle.radius && !isPlayerInvincible) {
+        // Player touches the enemy circle and is not invincible
+        playerCircle.lives--;
 
-            // Move enemy to a new random position - Comment this out to prevent changing enemy position
-            // enemy.x = Math.random() * canvas.width;
-            // enemy.y = Math.random() * canvas.height;
+        // Move enemy to a new random position - Comment this out to prevent changing enemy position
+        // enemyCircle.x = Math.random() * canvas.width;
+        // enemyCircle.y = Math.random() * canvas.height;
 
-            // Activate flashing and invincibility for 2 seconds
-            playerFlashTimer = 2000;
-            isPlayerInvincible = true;
+        // Activate flashing and invincibility for 2 seconds
+        playerFlashTimer = 2000;
+        isPlayerInvincible = true;
 
-            // Reset invincibility after 2 seconds
-            setTimeout(() => {
-                isPlayerInvincible = false;
-            }, 2000);
+        // Reset invincibility after 2 seconds
+        setTimeout(() => {
+            isPlayerInvincible = false;
+        }, 2000);
 
-            // Check if player is out of lives
-            if (playerCircle.lives <= 0) {
-                gameOver();
-            }
+        // Check if player is out of lives
+        if (playerCircle.lives <= 0) {
+            gameOver();
+        }
+    }
+
+    // Update bullet positions and remove bullets that go off-screen
+    bullets.forEach((bullet, index) => {
+        bullet.x += Math.cos(bullet.angle) * bulletSpeed;
+        bullet.y += Math.sin(bullet.angle) * bulletSpeed;
+
+        if (bullet.x < 0 || bullet.x > worldWidth || bullet.y < 0 || bullet.y > worldHeight) {
+            bullets.splice(index, 1);
         }
 
-        // Update bullet positions and remove bullets that go off-screen
-        bullets.forEach((bullet, bulletIndex) => {
-            bullet.x += Math.cos(bullet.angle) * bulletSpeed;
-            bullet.y += Math.sin(bullet.angle) * bulletSpeed;
-
-            if (bullet.x < 0 || bullet.x > worldWidth || bullet.y < 0 || bullet.y > worldHeight) {
-                bullets.splice(bulletIndex, 1);
+        const distanceSq = (enemyCircle.x - bullet.x) ** 2 + (enemyCircle.y - bullet.y) ** 2;
+        const minDistance = enemyCircle.radius + 3; // Enemy circle radius + bullet radius
+    
+        if (distanceSq < minDistance ** 2) {
+            // Enemy hit by player bullet
+            enemyCircle.lives--;
+            bullets.splice(index, 1); // Remove the bullet
+        
+            // Check if enemy is out of lives
+            if (enemyCircle.lives <= 0) {
+                // Move enemy to a new random position
+                enemyCircle.x = Math.random() * worldWidth;
+                enemyCircle.y = Math.random() * worldHeight;
+                enemyCircle.lives = 3; // Reset enemy lives
+            
+                // Update score
+                score += 100;
+                scoreElement.textContent = score;
             }
-
-            const distanceSq = (enemy.x - bullet.x) ** 2 + (enemy.y - bullet.y) ** 2;
-            const minDistance = enemy.radius + 3; // Enemy radius + bullet radius
-
-            if (distanceSq < minDistance ** 2) {
-                // Enemy hit by player bullet
-                enemy.lives--;
-                bullets.splice(bulletIndex, 1); // Remove the bullet
-
-                // Check if enemy is out of lives
-                if (enemy.lives <= 0) {
-                    // Move enemy to a new random position
-                    enemies.splice(enemyIndex, 1); // Remove the dead enemy
-
-                    // Update score
-                    score += 100;
-                    scoreElement.textContent = score;
-
-                    // Check if we need to add a new enemy
-                    if (score >= nextEnemyScoreThreshold) {
-                        addEnemy();
-                        nextEnemyScoreThreshold += Math.floor(Math.random() * 51) + 250;
-                    }
-                }
-            }
-        });
-
-        // Periodically shoot bullets from enemy towards player
-        if (!enemy.lastShotTime || Date.now() - enemy.lastShotTime > enemy.shootCooldown) {
-            const angleToPlayer = Math.atan2(playerCircle.y - enemy.y, playerCircle.x - enemy.x);
-            enemyBullets.push({
-                x: enemy.x,
-                y: enemy.y,
-                angle: angleToPlayer
-            });
-            enemy.lastShotTime = Date.now();
         }
     });
 
-    // Update enemy bullets positions and remove bullets that go off-screen
+
+    // Update enemy behavior
+    updateEnemy();
+
+    // Update enemy bullet positions and remove bullets that go off-screen
     enemyBullets.forEach((bullet, index) => {
         bullet.x += Math.cos(bullet.angle) * enemyBulletSpeed;
         bullet.y += Math.sin(bullet.angle) * enemyBulletSpeed;
@@ -231,35 +207,21 @@ function update() {
         if (bullet.x < 0 || bullet.x > worldWidth || bullet.y < 0 || bullet.y > worldHeight) {
             enemyBullets.splice(index, 1);
         }
-
-        const distanceToPlayer = Math.sqrt((bullet.x - playerCircle.x) ** 2 + (bullet.y - playerCircle.y) ** 2);
-        if (distanceToPlayer < playerCircle.radius && !isPlayerInvincible) {
-            // Player hit by enemy bullet
-            playerCircle.lives--;
-            enemyBullets.splice(index, 1); // Remove the bullet
-
-            // Activate flashing and invincibility for 2 seconds
-            playerFlashTimer = 2000;
-            isPlayerInvincible = true;
-
-            // Reset invincibility after 2 seconds
-            setTimeout(() => {
-                isPlayerInvincible = false;
-            }, 2000);
-
-            // Check if player is out of lives
-            if (playerCircle.lives <= 0) {
-                gameOver();
-            }
-        }
     });
 
-    // Update player flashing effect
-    if (playerFlashTimer > 0) {
-        playerFlashTimer -= 16; // Approximate frame duration (60fps)
-    }
-}
+    // Update distortion level based on time for pulsating effect
+    distortionLevel = Math.sin(Date.now() / 2000) * maxDistortion;
 
+    // Update player flash timer and invincibility
+    if (playerFlashTimer > 0) {
+        playerFlashTimer -= 16; // Decrease by frame time (assuming 60 FPS)
+    } else {
+        isPlayerInvincible = false; // End invincibility after flashing period
+    }
+
+    // Check for collisions
+    checkCollisions();
+}
 
 
 function updateEnemy() {
@@ -521,19 +483,18 @@ function initializeGame() {
     playerCircle.y = canvas.height / 2;
     playerCircle.lives = 3;
 
-    // Reset enemies array
-    enemies.length = 0;
-    addEnemy();
+    // Reset enemy position randomly
+    enemyCircle.x = Math.random() * canvas.width;
+    enemyCircle.y = Math.random() * canvas.height;
+    enemyCircle.lives = 3;
 
     // Reset score
     score = 0;
     scoreElement.textContent = score;
 
-    // Reset score threshold
-    nextEnemyScoreThreshold = Math.floor(Math.random() * 51) + 250; // Random number between 250 and 300
-
     isGameOver = false; // Reset game over state
 }
+
 
 // Initialize the game
 initializeGame();
