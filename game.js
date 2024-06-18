@@ -164,15 +164,16 @@ function update() {
         }
     }
 
-    // Update bullet positions and remove bullets that go off-screen
-    bullets.forEach((bullet, index) => {
+        // Update bullet positions and remove bullets that go off-screen
+        bullets.forEach((bullet, index) => {
         bullet.x += Math.cos(bullet.angle) * bulletSpeed;
         bullet.y += Math.sin(bullet.angle) * bulletSpeed;
-
+        
         if (bullet.x < 0 || bullet.x > worldWidth || bullet.y < 0 || bullet.y > worldHeight) {
             bullets.splice(index, 1);
         }
-
+    
+        // Check collision with enemy
         const distanceSq = (enemyCircle.x - bullet.x) ** 2 + (enemyCircle.y - bullet.y) ** 2;
         const minDistance = enemyCircle.radius + 3; // Enemy circle radius + bullet radius
     
@@ -188,12 +189,13 @@ function update() {
                 enemyCircle.y = Math.random() * worldHeight;
                 enemyCircle.lives = 3; // Reset enemy lives
             
-                // Update score
-                score += 100;
+                // Update score with random points between 50 and 100
+                const points = Math.floor(Math.random() * 51) + 50;
+                score += points;
                 scoreElement.textContent = score;
             }
         }
-    });
+    }); 
 
 
     // Update enemy behavior
