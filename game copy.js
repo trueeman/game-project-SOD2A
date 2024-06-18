@@ -2,6 +2,7 @@ const startMenu = document.getElementById('startMenu');
 const startButton = document.getElementById('startButton');
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+const scoreElement = document.getElementById('score');
 canvas.width = window.innerWidth * 0.75; // Set canvas width to 75% of window width
 canvas.height = window.innerHeight * 0.75; // Set canvas height to 75% of window height
 
@@ -24,6 +25,7 @@ const playerCircle = {
 // Enemy properties
 const enemyCircle = {
     radius: 20,
+    lives: 3, // Initial lives
     shootCooldown: 2500, // 3 seconds cooldown between shots
     x: Math.random() * worldWidth, // Random x position within canvas width
     y: Math.random() * worldHeight // Random y position within canvas height
@@ -43,6 +45,7 @@ const bulletSpeed = 5;
 const enemyBullets = [];
 const enemyBulletSpeed = 2.5;
 
+
 // Keyboard input tracking
 const keys = {
     w: false,
@@ -50,6 +53,8 @@ const keys = {
     s: false,
     d: false
 };
+
+let isPaused = false;
 
 // Distortion effect parameters
 let distortionLevel = 0; // Initial distortion level
@@ -72,6 +77,12 @@ window.addEventListener('keyup', (e) => {
     if (e.key === 'a') keys.a = false;
     if (e.key === 's') keys.s = false;
     if (e.key === 'd') keys.d = false;
+});
+
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'p' || e.key === 'P') {
+        isPaused = !isPaused;
+    }
 });
 
 // Event listener for mouse movement on the canvas
@@ -98,6 +109,8 @@ canvas.addEventListener('click', () => {
 
 // Function to update game state
 function update() {
+    if (isPaused) return; // Skip update if the game is paused
+    
     let dx = 0;
     let dy = 0;
 
@@ -122,7 +135,7 @@ function update() {
     playerCircle.x = Math.max(playerCircle.radius, Math.min(worldWidth - playerCircle.radius, playerCircle.x));
     playerCircle.y = Math.max(playerCircle.radius, Math.min(worldHeight - playerCircle.radius, playerCircle.y));
 
-        // Check collision with enemy circle
+    // Check collision with enemy circle
     const distanceToEnemy = Math.sqrt((playerCircle.x - enemyCircle.x) ** 2 + (playerCircle.y - enemyCircle.y) ** 2);
     if (distanceToEnemy < playerCircle.radius + enemyCircle.radius && !isPlayerInvincible) {
         // Player touches the enemy circle and is not invincible
@@ -131,6 +144,20 @@ function update() {
         // Move enemy to a new random position - Comment this out to prevent changing enemy position
         // enemyCircle.x = Math.random() * canvas.width;
         // enemyCircle.y = Math.random() * canvas.height;
+
+        // Activate flashing and invincibility for 2 seconds
+        playerFlashTimer = 2000;
+        isPlayerInvincible = true;
+
+        // Reset invincibility after 2 seconds
+        setTimeout(() => {
+            isPlayerInvincible = false;
+        }, 2000);
+
+        // Check if player is out of lives
+        if (playerCircle.lives <= 0) {
+            gameOver();
+        }
     }
 
     // Update bullet positions and remove bullets that go off-screen
@@ -141,7 +168,29 @@ function update() {
         if (bullet.x < 0 || bullet.x > worldWidth || bullet.y < 0 || bullet.y > worldHeight) {
             bullets.splice(index, 1);
         }
+
+        const distanceSq = (enemyCircle.x - bullet.x) ** 2 + (enemyCircle.y - bullet.y) ** 2;
+        const minDistance = enemyCircle.radius + 3; // Enemy circle radius + bullet radius
+    
+        if (distanceSq < minDistance ** 2) {
+            // Enemy hit by player bullet
+            enemyCircle.lives--;
+            bullets.splice(index, 1); // Remove the bullet
+        
+            // Check if enemy is out of lives
+            if (enemyCircle.lives <= 0) {
+                // Move enemy to a new random position
+                enemyCircle.x = Math.random() * worldWidth;
+                enemyCircle.y = Math.random() * worldHeight;
+                enemyCircle.lives = 3; // Reset enemy lives
+            
+                // Update score
+                score += 100;
+                scoreElement.textContent = score;
+            }
+        }
     });
+
 
     // Update enemy behavior
     updateEnemy();
@@ -169,6 +218,7 @@ function update() {
     // Check for collisions
     checkCollisions();
 }
+
 
 function updateEnemy() {
     // Calculate angle from enemy to player
@@ -206,6 +256,11 @@ function checkCollisions() {
             setTimeout(() => {
                 isPlayerInvincible = false;
             }, 2000);
+
+            // Check if player is out of lives
+            if (playerCircle.lives <= 0) {
+                gameOver();
+            }
         }
     });
 }
@@ -217,15 +272,12 @@ function draw() {
     const livesX = 25; // Starting X position for lives indicator
     const livesY = 25; // Starting Y position for lives indicator
     const livesSpacing = 20; // Spacing between each life indicator
-
-    // Decrease the size of each life indicator
-    const lifeRadius = 10;
+    const lifeRadius = 10; // Radius of each life indicator
 
     ctx.strokeStyle = 'white';
     ctx.lineWidth = 2;
     ctx.fillStyle = 'black';
 
-    // Draw player lives
     // Draw player lives
     for (let i = 0; i < playerCircle.lives; i++) {
         const lifeX = livesX + i * (2 * lifeRadius + livesSpacing);
@@ -327,10 +379,48 @@ function draw() {
     ctx.filter = `blur(${Math.abs(distortionLevel)}px)`;
     ctx.drawImage(canvas, 0, 0);
     ctx.restore();
+
+    // If player has no lives left, display game over
+    if (playerCircle.lives <= 0) {
+        ctx.save();
+        ctx.fillStyle = 'white';
+        ctx.font = '48px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Game Over', canvas.width / 2, canvas.height / 2);
+        ctx.restore();
+    }
+
+    // Draw "Paused" text if the game is paused
+    if (isPaused) {
+        ctx.save();
+        ctx.fillStyle = 'white';
+        ctx.font = '48px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Paused', canvas.width / 2, canvas.height / 2);
+        ctx.restore();
+    }
+}
+
+
+// Define a variable to track game over state
+let isGameOver = false;
+
+// Game over function
+function gameOver() {
+    // Stop the game loop or perform any necessary game over actions
+    // For now, we'll just log a message to the console
+    console.log('Game Over!');
+
+    // Set game over state to true
+    isGameOver = true;
 }
 
 // Game loop
 function loop() {
+    if (isGameOver) {
+        return; // Exit the loop if game over
+    }
+
     update();
     draw();
     requestAnimationFrame(loop);
@@ -373,6 +463,11 @@ function checkCollisions() {
             setTimeout(() => {
                 isPlayerInvincible = false;
             }, 2000);
+
+            // Check if player is out of lives
+            if (playerCircle.lives <= 0) {
+                gameOver();
+            }
         }
     });
 }
@@ -387,7 +482,15 @@ function initializeGame() {
     // Reset enemy position randomly
     enemyCircle.x = Math.random() * canvas.width;
     enemyCircle.y = Math.random() * canvas.height;
+    enemyCircle.lives = 3;
+
+    // Reset score
+    score = 0;
+    scoreElement.textContent = score;
+
+    isGameOver = false; // Reset game over state
 }
+
 
 // Initialize the game
 initializeGame();
