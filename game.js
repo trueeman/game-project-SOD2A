@@ -12,7 +12,9 @@ const playerCircle = {
     radius: 20,
     speed: 2.5,
     angle: 0,
-    lives: 3 // Initial lives
+    lives: 3, // Initial lives
+    lastShotTime: 0, // Timestamp of the last shot
+    shootCooldown: 333, // Cooldown time between shots in milliseconds
 };
 
 // Triangle properties
@@ -66,11 +68,16 @@ canvas.addEventListener('mousemove', (e) => {
 
 // Event listener for mouse click on the canvas (shooting bullets)
 canvas.addEventListener('click', () => {
-    bullets.push({
-        x: playerCircle.x,
-        y: playerCircle.y,
-        angle: playerCircle.angle
-    });
+    // Check if enough time has passed since the last shot
+    const currentTime = Date.now();
+    if (currentTime - playerCircle.lastShotTime > playerCircle.shootCooldown) {
+        bullets.push({
+            x: playerCircle.x,
+            y: playerCircle.y,
+            angle: playerCircle.angle
+        });
+        playerCircle.lastShotTime = currentTime; // Update last shot time
+    }
 });
 
 // Function to update game state
@@ -113,103 +120,102 @@ function update() {
     distortionLevel = Math.sin(Date.now() / 2000) * maxDistortion;
 }
 
-// Function to draw game elements
 function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Calculate the camera offset to center the player
-  const offsetX = canvas.width / 2 - playerCircle.x;
-  const offsetY = canvas.height / 2 - playerCircle.y;
+    // Draw lives indicator on the top left side
+    const livesX = 25; // Starting X position for lives indicator
+    const livesY = 25; // Starting Y position for lives indicator
+    const livesSpacing = 20; // Spacing between each life indicator
 
-  ctx.save();
-  ctx.translate(offsetX, offsetY);
+    // Decrease the size of each life indicator
+    const lifeRadius = 10;
 
-  // Draw game world boundaries with white outline
-  ctx.strokeStyle = 'white';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(0, 0, worldWidth, worldHeight);
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 2;
+    ctx.fillStyle = 'black';
 
-  // Draw bullets
-  bullets.forEach(bullet => {
-      ctx.save();
-      ctx.translate(bullet.x, bullet.y);
-      ctx.beginPath();
-      ctx.arc(0, 0, 5, 0, Math.PI * 2);
-      ctx.fillStyle = 'red';
-      ctx.fill();
-      ctx.restore();
-  });
+    for (let i = 0; i < playerCircle.lives; i++) {
+        const lifeX = livesX + i * (2 * lifeRadius + livesSpacing);
+        
+        // Draw white outline for each life
+        ctx.beginPath();
+        ctx.arc(lifeX, livesY, lifeRadius + 2, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Draw black filled circle for each life
+        ctx.beginPath();
+        ctx.arc(lifeX, livesY, lifeRadius, 0, Math.PI * 2);
+        ctx.fill();
+    }
 
-  // Draw white outline for player circle
-  ctx.save();
-  ctx.translate(playerCircle.x, playerCircle.y);
-  ctx.beginPath();
-  ctx.arc(0, 0, playerCircle.radius + 2, 0, Math.PI * 2);
-  ctx.strokeStyle = 'white';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.restore();
+    // Calculate the camera offset to center the player
+    const offsetX = canvas.width / 2 - playerCircle.x;
+    const offsetY = canvas.height / 2 - playerCircle.y;
 
-  // Draw playerCircle
-  ctx.save();
-  ctx.translate(playerCircle.x, playerCircle.y);
-  ctx.rotate(playerCircle.angle);
-  ctx.beginPath();
-  ctx.arc(0, 0, playerCircle.radius, 0, Math.PI * 2);
-  ctx.fillStyle = 'black';
-  ctx.fill();
-  ctx.restore();
+    ctx.save();
+    ctx.translate(offsetX, offsetY);
 
-  // Calculate triangle position
-  const triangleX = playerCircle.x + Math.cos(playerCircle.angle) * triangle.distance;
-  const triangleY = playerCircle.y + Math.sin(playerCircle.angle) * triangle.distance;
+    // Draw game world boundaries with white outline
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(0, 0, worldWidth, worldHeight);
 
-  // Draw triangle
-  ctx.save();
-  ctx.translate(triangleX, triangleY);
-  ctx.rotate(playerCircle.angle + Math.PI / 2); // Rotate the triangle 90 degrees to align with the cursor direction
-  ctx.beginPath();
-  ctx.moveTo(0, -triangle.size / 2);
-  ctx.lineTo(triangle.size / 1, triangle.size / 2);
-  ctx.lineTo(-triangle.size / 1, triangle.size / 2);
-  ctx.closePath();
-  ctx.fillStyle = 'white';
-  ctx.fill();
-  ctx.restore();
+    // Draw bullets
+    bullets.forEach(bullet => {
+        ctx.save();
+        ctx.translate(bullet.x, bullet.y);
+        ctx.beginPath();
+        ctx.arc(0, 0, 5, 0, Math.PI * 2);
+        ctx.fillStyle = 'white';
+        ctx.fill();
+        ctx.restore();
+    });
 
-  ctx.restore(); // Restore the initial context state after applying the camera offset
+    // Draw white outline for player circle
+    ctx.save();
+    ctx.translate(playerCircle.x, playerCircle.y);
+    ctx.beginPath();
+    ctx.arc(0, 0, playerCircle.radius + 2, 0, Math.PI * 2);
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
 
-  // Draw lives indicator outside and underneath the canvas
-  const livesX = 10;
-  const livesY = canvas.height + 20; // Position below the canvas
-  const livesSpacing = 20; // Spacing between each life indicator
+    // Draw playerCircle
+    ctx.save();
+    ctx.translate(playerCircle.x, playerCircle.y);
+    ctx.rotate(playerCircle.angle);
+    ctx.beginPath();
+    ctx.arc(0, 0, playerCircle.radius, 0, Math.PI * 2);
+    ctx.fillStyle = 'black';
+    ctx.fill();
+    ctx.restore();
 
-  // Calculate total width needed for lives indicators
-  const totalWidth = playerCircle.lives * (2 * playerCircle.radius + livesSpacing) - livesSpacing;
-  const startX = (canvas.width - totalWidth) / 2;
+    // Calculate triangle position
+    const triangleX = playerCircle.x + Math.cos(playerCircle.angle) * triangle.distance;
+    const triangleY = playerCircle.y + Math.sin(playerCircle.angle) * triangle.distance;
 
-  for (let i = 0; i < playerCircle.lives; i++) {
-      const lifeX = startX + i * (2 * playerCircle.radius + livesSpacing);
-      
-      // Draw white outline for each life
-      ctx.beginPath();
-      ctx.arc(lifeX, livesY, playerCircle.radius + 2, 0, Math.PI * 2);
-      ctx.strokeStyle = 'white';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      
-      // Draw black filled circle for each life
-      ctx.beginPath();
-      ctx.arc(lifeX, livesY, playerCircle.radius, 0, Math.PI * 2);
-      ctx.fillStyle = 'black';
-      ctx.fill();
-  }
+    // Draw triangle
+    ctx.save();
+    ctx.translate(triangleX, triangleY);
+    ctx.rotate(playerCircle.angle + Math.PI / 2); // Rotate the triangle 90 degrees to align with the cursor direction
+    ctx.beginPath();
+    ctx.moveTo(0, -triangle.size / 2);
+    ctx.lineTo(triangle.size / 1, triangle.size / 2);
+    ctx.lineTo(-triangle.size / 1, triangle.size / 2);
+    ctx.closePath();
+    ctx.fillStyle = 'white';
+    ctx.fill();
+    ctx.restore();
 
-  // Apply distortion effect
-  ctx.save();
-  ctx.filter = `blur(${Math.abs(distortionLevel)}px)`;
-  ctx.drawImage(canvas, 0, 0);
-  ctx.restore();
+    ctx.restore(); // Restore the initial context state after applying the camera offset
+
+    // Apply distortion effect
+    ctx.save();
+    ctx.filter = `blur(${Math.abs(distortionLevel)}px)`;
+    ctx.drawImage(canvas, 0, 0);
+    ctx.restore();
 }
 
 
