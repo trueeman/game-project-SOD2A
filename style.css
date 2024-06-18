@@ -19,8 +19,28 @@ body {
 }
 
 #gameCanvas { 
-  
+    display: none;
     border: 1px solid white;
     display: block; 
     background: black;
+}
+
+#startMenu {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    flex-direction: column;
+}
+
+button {
+    padding: 10px 20px;
+    font-size: 18px;
+    cursor: pointer;
 }
