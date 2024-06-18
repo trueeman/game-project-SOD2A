@@ -21,7 +21,6 @@ body {
 #gameCanvas { 
     display: none;
     border: 1px solid white;
-    display: block; 
     background: black;
 }
 

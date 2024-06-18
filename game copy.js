@@ -14,7 +14,15 @@ const playerCircle = {
     angle: 0,
     lives: 3, // Initial lives
     lastShotTime: 0, // Timestamp of the last shot
-    shootCooldown: 333, // Cooldown time between shots in milliseconds
+    shootCooldown: 500, // Cooldown time between shots in milliseconds
+};
+
+// Enemy properties
+const enemyCircle = {
+    radius: 20,
+    shootCooldown: 3000, // 3 seconds cooldown between shots
+    x: Math.random() * canvas.width, // Random x position within canvas width
+    y: Math.random() * canvas.height // Random y position within canvas height
 };
 
 // Triangle properties
@@ -26,6 +34,10 @@ const triangle = {
 // Bullets array and properties
 const bullets = [];
 const bulletSpeed = 5;
+
+// Enemy bullets array and properties
+const enemyBullets = [];
+const enemyBulletSpeed = 1;
 
 // Keyboard input tracking
 const keys = {
@@ -116,8 +128,66 @@ function update() {
         }
     });
 
+    // Update enemy behavior
+    updateEnemy();
+
+    // Update enemy bullet positions and remove bullets that go off-screen
+    enemyBullets.forEach((bullet, index) => {
+        bullet.x += Math.cos(bullet.angle) * enemyBulletSpeed;
+        bullet.y += Math.sin(bullet.angle) * enemyBulletSpeed;
+    
+        if (bullet.x < 0 || bullet.x > worldWidth || bullet.y < 0 || bullet.y > worldHeight) {
+            enemyBullets.splice(index, 1);
+        }
+    });
+
     // Update distortion level based on time for pulsating effect
     distortionLevel = Math.sin(Date.now() / 2000) * maxDistortion;
+
+    // Check for collisions
+    checkCollisions();
+}
+
+function updateEnemy() {
+    // Calculate angle from enemy to player
+    const angleToPlayer = Math.atan2(playerCircle.y - enemyCircle.y, playerCircle.x - enemyCircle.x);
+
+    // Check if enough time has passed since the last enemy shot
+    const currentTime = Date.now();
+    if (currentTime - enemyCircle.lastShotTime > enemyCircle.shootCooldown) {
+        // Enemy shoots a bullet towards the player
+        enemyBullets.push({
+            x: enemyCircle.x,
+            y: enemyCircle.y,
+            angle: angleToPlayer
+        });
+        enemyCircle.lastShotTime = currentTime; // Update last shot time
+    }
+}
+
+function checkCollisions() {
+    // Check collisions between player and enemy bullets
+    enemyBullets.forEach((bullet, index) => {
+        const distanceSq = (playerCircle.x - bullet.x) ** 2 + (playerCircle.y - bullet.y) ** 2;
+        const minDistance = playerCircle.radius + 5; // Player circle radius + bullet radius
+
+        if (distanceSq < minDistance ** 2) {
+            // Player hit by enemy bullet
+            playerCircle.lives--;
+            enemyBullets.splice(index, 1);
+        }
+    });
+
+    // Check collisions between enemy and player bullets
+    bullets.forEach((bullet, bulletIndex) => {
+        const distanceSq = (enemyCircle.x - bullet.x) ** 2 + (enemyCircle.y - bullet.y) ** 2;
+        const minDistance = enemyCircle.radius + 5; // Enemy circle radius + bullet radius
+
+        if (distanceSq < minDistance ** 2) {
+            // Enemy hit by player bullet
+            bullets.splice(bulletIndex, 1);
+        }
+    });
 }
 
 function draw() {
@@ -135,14 +205,15 @@ function draw() {
     ctx.lineWidth = 2;
     ctx.fillStyle = 'black';
 
+    // Draw player lives
     for (let i = 0; i < playerCircle.lives; i++) {
         const lifeX = livesX + i * (2 * lifeRadius + livesSpacing);
-        
+
         // Draw white outline for each life
         ctx.beginPath();
         ctx.arc(lifeX, livesY, lifeRadius + 2, 0, Math.PI * 2);
         ctx.stroke();
-        
+
         // Draw black filled circle for each life
         ctx.beginPath();
         ctx.arc(lifeX, livesY, lifeRadius, 0, Math.PI * 2);
@@ -172,6 +243,23 @@ function draw() {
         ctx.restore();
     });
 
+    // Draw enemy circle
+    ctx.beginPath();
+    ctx.arc(enemyCircle.x, enemyCircle.y, enemyCircle.radius, 0, Math.PI * 2);
+    ctx.fillStyle = 'red';
+    ctx.fill();
+
+    // Draw enemy bullets
+    enemyBullets.forEach(bullet => {
+        ctx.save();
+        ctx.translate(bullet.x, bullet.y);
+        ctx.beginPath();
+        ctx.arc(0, 0, 5, 0, Math.PI * 2);
+        ctx.fillStyle = 'red';
+        ctx.fill();
+        ctx.restore();
+    });
+
     // Draw white outline for player circle
     ctx.save();
     ctx.translate(playerCircle.x, playerCircle.y);
@@ -182,7 +270,7 @@ function draw() {
     ctx.stroke();
     ctx.restore();
 
-    // Draw playerCircle
+    // Draw player circle
     ctx.save();
     ctx.translate(playerCircle.x, playerCircle.y);
     ctx.rotate(playerCircle.angle);
@@ -218,6 +306,58 @@ function draw() {
     ctx.restore();
 }
 
+// Update game state function
+function update() {
+    let dx = 0;
+    let dy = 0;
+
+    // Handle player movement based on keyboard input
+    if (keys.w) dy -= 1;
+    if (keys.s) dy += 1;
+    if (keys.a) dx -= 1;
+    if (keys.d) dx += 1;
+
+    // Normalize movement vector if needed
+    const magnitude = Math.sqrt(dx * dx + dy * dy);
+    if (magnitude > 0) {
+        dx = (dx / magnitude) * playerCircle.speed;
+        dy = (dy / magnitude) * playerCircle.speed;
+    }
+
+    // Update player position
+    playerCircle.x += dx;
+    playerCircle.y += dy;
+
+    // Keep player within world boundaries
+    playerCircle.x = Math.max(playerCircle.radius, Math.min(worldWidth - playerCircle.radius, playerCircle.x));
+    playerCircle.y = Math.max(playerCircle.radius, Math.min(worldHeight - playerCircle.radius, playerCircle.y));
+
+    // Update bullet positions and remove bullets that go off-screen
+    bullets.forEach((bullet, index) => {
+        bullet.x += Math.cos(bullet.angle) * bulletSpeed;
+        bullet.y += Math.sin(bullet.angle) * bulletSpeed;
+
+        if (bullet.x < 0 || bullet.x > worldWidth || bullet.y < 0 || bullet.y > worldHeight) {
+            bullets.splice(index, 1);
+        }
+    });
+
+    // Update bullet positions and remove bullets that go off-screen
+    enemyBullets.forEach((bullet, index) => {
+        bullet.x += Math.cos(bullet.angle) * bulletSpeed;
+        bullet.y += Math.sin(bullet.angle) * bulletSpeed;
+
+        if (bullet.x < 0 || bullet.x > worldWidth || bullet.y < 0 || bullet.y > worldHeight) {
+            enemyBullets.splice(index, 1);
+        }
+    });
+
+    // Update distortion level based on time for pulsating effect
+    distortionLevel = Math.sin(Date.now() / 2000) * maxDistortion;
+
+    // Check collisions
+    checkCollisions();
+}
 
 // Game loop
 function loop() {
@@ -232,3 +372,43 @@ startButton.addEventListener('click', () => {
     canvas.style.display = 'block';
     loop();
 });
+
+// Interval for enemy shooting
+setInterval(() => {
+    const angleToPlayer = Math.atan2(playerCircle.y - enemyCircle.y, playerCircle.x - enemyCircle.x);
+    enemyBullets.push({
+        x: enemyCircle.x,
+        y: enemyCircle.y,
+        angle: angleToPlayer
+    });
+}, enemyCircle.shootCooldown);
+
+// Collision detection function
+function checkCollisions() {
+    // Check collisions between player and enemy bullets
+    enemyBullets.forEach((bullet, index) => {
+        const distanceSq = (playerCircle.x - bullet.x) ** 2 + (playerCircle.y - bullet.y) ** 2;
+        const minDistance = playerCircle.radius + 3; // Player circle radius + bullet radius
+
+        if (distanceSq < minDistance ** 2) {
+            // Player hit by enemy bullet
+            playerCircle.lives--;
+            enemyBullets.splice(index, 1);
+        }
+    });
+}
+
+// Initialize game function
+function initializeGame() {
+    // Reset player position and lives
+    playerCircle.x = canvas.width / 2;
+    playerCircle.y = canvas.height / 2;
+    playerCircle.lives = 3;
+
+    // Reset enemy position randomly
+    enemyCircle.x = Math.random() * canvas.width;
+    enemyCircle.y = Math.random() * canvas.height;
+}
+
+// Initialize the game
+initializeGame();
